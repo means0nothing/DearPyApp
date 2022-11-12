@@ -44,7 +44,7 @@ setup(
         'Development Status :: 3 - Alpha',  # '3 - Alpha', '4 - Beta', '5 - Production/Stable'
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
-        'Operating System :: Microsoft :: Windows :: Windows 10'
+        'Operating System :: Microsoft :: Windows :: Windows 10',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Topic :: Software Development :: Libraries :: Python Modules'
