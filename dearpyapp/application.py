@@ -3,7 +3,7 @@ import typing as t
 import win32api
 import dearpygui.dearpygui as dpg
 
-from .utils import dpg_get_container
+from .utils import dpg_get_item_container
 
 
 def _run_callbacks(jobs):
@@ -34,9 +34,9 @@ class _DpgAppMeta(type):
             _DpgAppMeta.instance = super().__call__(*args, **kwargs)
             return _DpgAppMeta.instance
         else:
-            raise TypeError(f'Only one {cls} instance may be crated')
+            raise TypeError(f'Only one {cls} instance may be created')
 
-
+# TODO total rethinking needed
 class DpgApp(metaclass=_DpgAppMeta):
     loop = asyncio.get_event_loop()
     primary_window = None
@@ -47,14 +47,15 @@ class DpgApp(metaclass=_DpgAppMeta):
     btn_restore = None
     size_subscribers = set()  # TODO как-то не так надо
 
-    def start(self, *, title: str = 'App', small_icon: str = '', large_icon: str = '',
-              width: int = 1280, height: int = 800, x_pos: int = 100, y_pos: int = 100,
-              min_width: int = 0, max_width: int = 10000, min_height: int = 0, max_height: int = 10000,
-              resizable: bool = False, always_on_top: bool = False,
-              decorated: bool = False, clear_color: t.Union[list[float], tuple[float]] = (0, 0, 0, 255),
-              docking: bool = False, docking_space: bool = False,
-              load_init_file: str = '', init_file: str = '', auto_save_init_file: bool = False,
-              ) -> None:
+    def run(
+        self, *, title: str = 'App', small_icon: str = '', large_icon: str = '',
+        width: int = 1280, height: int = 800, x_pos: int = 100, y_pos: int = 100,
+        min_width: int = 0, max_width: int = 10000, min_height: int = 0, max_height: int = 10000,
+        resizable: bool = False, always_on_top: bool = False,
+        decorated: bool = False, clear_color: t.Union[list[float], tuple[float]] = (0, 0, 0, 255),
+        docking: bool = False, docking_space: bool = False,
+        load_init_file: str = '', init_file: str = '', auto_save_init_file: bool = False,
+        ) -> None:
 
         # TODO лучше просто сделать kwargs с дефолтами в классе
         self.viewport_size = self.viewport_size or (width, height)
@@ -89,9 +90,10 @@ class DpgApp(metaclass=_DpgAppMeta):
         self.loop.create_task(gui_task())
         self.loop.run_forever()
 
+    # TODO сделать через таблицу шапку
     def set_primary_window(self, title_group):
         move = False
-        self.primary_window = window = dpg_get_container(title_group)
+        self.primary_window = window = dpg_get_item_container(title_group)
         dpg.configure_item(window, pos=(-1, -1), width=self.viewport_size[0], height=self.viewport_size[1],
                            no_title_bar=True, no_move=True)
 
@@ -102,13 +104,16 @@ class DpgApp(metaclass=_DpgAppMeta):
                 size = dpg.get_item_rect_size(a)
                 # TODO сделать как-то по другому, а не делать оффсет посишена на -1 вначале
                 size = (size[0] + pos[0], size[1] + pos[1]) if pos != [0, 0] else size
-                dpg.set_item_indent(control_win, max(1, size[0] - control_win_width))
+                dpg.set_item_indent(control_win, max(1, size[0] - control_win_width - 10))
                 dpg.configure_item(a, width=size[0], height=size[1])
                 dpg.configure_viewport(0, width=size[0], height=size[1])
                 dpg.configure_item(a, pos=(0, 0))
             elif move:
-                # TODO подтягивать текущую относительную позицию
                 if self.is_viewport_maximized:
+                    # TODO подтягивать текущую относительную позицию
+                    # relative_pos = dpg.get_mouse_pos(local=False)[0] / dpg.get_item_rect_size(self.primary_window)[0]
+                    # pos_offset = int(self.viewport_size[0] * relative_pos)
+                    # self.viewport_pos = (self.viewport_pos[0] + pos_offset, self.viewport_pos[1])
                     self.restore()
                 dpg.configure_viewport(0, x_pos=self.viewport_pos[0] + a[1], y_pos=self.viewport_pos[1] + a[2])
             self._update_viewport_info()
@@ -135,7 +140,7 @@ class DpgApp(metaclass=_DpgAppMeta):
         with dpg.item_handler_registry() as title_click:
             dpg.add_item_clicked_handler(0, callback=lambda s, a, u: click(True, True))
 
-        control_win_width = 100
+        control_win_width = 80
         with dpg.child_window(no_scrollbar=True, width=control_win_width, height=20,
                               parent=title_group, border=False) as control_win:
             with dpg.group(horizontal=True, horizontal_spacing=10):
@@ -164,14 +169,23 @@ class DpgApp(metaclass=_DpgAppMeta):
 
     def maximize(self):
         self.is_viewport_maximized = True
-        x_pos, y_pos, width, height = win32api.GetMonitorInfo(win32api.MonitorFromPoint((10, 10)))['Work']
-        dpg.configure_viewport(0, x_pos=x_pos, y_pos=y_pos, width=width, height=height)
-        dpg.configure_item(self.primary_window, width=width, height=height, no_resize=True)
-        dpg.configure_item(self.btn_maximize, show=False)
-        dpg.configure_item(self.btn_restore, show=True)
-        self._update_viewport_info()
-        for callback in self.size_subscribers:
-            self.loop.call_later(0.1, callback)
+        viewport_pos = dpg.get_viewport_pos()
+        viewport_pos = (viewport_pos[0] + dpg.get_viewport_width(), viewport_pos[1])
+        try:
+            x_start, y_start, x_stop, y_stop = win32api.GetMonitorInfo(
+                win32api.MonitorFromPoint(viewport_pos))['Work']
+        except win32api.error:
+            ...
+        else:
+            width = x_stop - x_start
+            height = y_stop - y_start
+            dpg.configure_viewport(0, x_pos=x_start, y_pos=y_start, width=width, height=height)
+            dpg.configure_item(self.primary_window, width=width, height=height, no_resize=True)
+            dpg.configure_item(self.btn_maximize, show=False)
+            dpg.configure_item(self.btn_restore, show=True)
+            self._update_viewport_info()
+            for callback in self.size_subscribers:
+                self.loop.call_later(0.1, callback)
 
     def restore(self):
         self.is_viewport_maximized = False
