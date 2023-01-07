@@ -87,9 +87,15 @@ class TableLog:
                     with dpg.table_row() as row:
                         fields = []
                         for index, field in enumerate(data):
-                            # TODO завести параметр wrap в field
-                            fields.append(
-                                dpg.add_text(field, wrap=self.column_widths[index] if self.wrap_text else -1))
+                            if isinstance(field, t.Callable):
+                                fields.append(field())
+                                continue
+
+                            color = c.NONE
+                            if not isinstance(field, str):
+                                field, color = field
+                            fields.append(dpg.add_text(field, color=color,
+                                                       wrap=self.column_widths[index] if self.wrap_text else -1))
                     self.rows.update({row: fields})
             self.set_y_scroll()
 
@@ -147,17 +153,17 @@ class TableLog:
         mouse_pos = (dpg.get_x_scroll(gui.table_window) + mouse_pos[0] - width_offset,
                      dpg.get_y_scroll(gui.table_window) + mouse_pos[1] - height_offset)  # + 15
 
-        self.input_text_cell and dpg.move_item(self.input_text_cell, before=gui.input_text)
-        row, index = dpg_get_item_by_pos(tuple(self.rows.values()), mouse_pos, return_index=True)
-        self.input_text_row = tuple(self.rows)[index]
-        cell, index = dpg_get_item_by_pos(row, mouse_pos, horizontal=True, return_index=True)
-        self.input_text_cell = cell
-        text, width, height = dpg_get_text_from_cell(cell, wrap=self.column_widths[index])
-
-        dpg.configure_item(gui.input_text, default_value=text,
-                           width=width + 2, height=height)  # width + 1 prevent input_text to scrolling
-        dpg.move_item(gui.input_text, before=cell)
-        dpg.move_item(cell, parent=gui.input_text_stage)
+        row, row_index = dpg_get_item_by_pos(tuple(self.rows.values()), mouse_pos, return_index=True)
+        cell, cell_index = dpg_get_item_by_pos(row, mouse_pos, horizontal=True, return_index=True)
+        text, width, height = dpg_get_text_from_cell(cell, wrap=self.column_widths[cell_index])
+        if text:
+            self.input_text_cell and dpg.move_item(self.input_text_cell, before=gui.input_text)
+            self.input_text_row = tuple(self.rows)[row_index]
+            self.input_text_cell = cell
+            dpg.configure_item(gui.input_text, default_value=text,
+                               width=width + 2, height=height)  # width + 1 prevent input_text to scrolling
+            dpg.move_item(gui.input_text, before=cell)
+            dpg.move_item(cell, parent=gui.input_text_stage)
 
     # TODO implement delete method
     # def close(self):

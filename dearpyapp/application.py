@@ -5,6 +5,9 @@ import dearpygui.dearpygui as dpg
 
 from .utils import dpg_get_item_container
 
+# item, component, theme, handler
+# update, create
+
 
 def _run_callbacks(jobs):
     if jobs is not None:
@@ -85,10 +88,12 @@ class DpgApp(metaclass=_DpgAppMeta):
                 # TODO добавить в параметры период, а vsync убрать
                 await asyncio.sleep(1 / 40)
             self.after_close()
-            dpg.destroy_context()
+            # dpg.destroy_context()
             self.loop.stop()
+
         self.loop.create_task(gui_task())
         self.loop.run_forever()
+        self.loop.close()
 
     # TODO сделать через таблицу шапку
     def set_primary_window(self, title_group):

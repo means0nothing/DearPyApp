@@ -12,9 +12,11 @@ from .utils import (
     dpg_get_item_type,
     dpg_get_item_name,
     dpg_get_item_by_pos,
+    dpg_set_y_scroll,
     dpg_uuid,
     dpg_get_values,
     dpg_set_values,
-    dpg_get_text_from_cell
+    dpg_get_text_from_cell,
+    dpg_show_popup
 )
 

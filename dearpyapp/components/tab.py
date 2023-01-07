@@ -12,8 +12,7 @@ class TabInfo:
     tab_id: int
     title_min_width: int = 0
     no_close: bool = True
-    # TODO для всех евентов сделать callback
-    right_click_callback: t.Optional[t.Callable] = None
+    click_callback: t.Optional[t.Callable] = None
 
 
 class Tab:
@@ -33,7 +32,7 @@ class TabBar:
         self.title_width = title_width
         self.tab_factory = tab_factory
         self.active_tab: t.Optional[Tab, t.Any] = None
-        self.tabs: list[Tab, t.Any] = []
+        self.tabs: list[t.Union[Tab, t.Any]] = []
 
     def set_tab(self, tab: Tab):
         if self.active_tab:
@@ -83,11 +82,6 @@ class TabBar:
         if not self.active_tab:
             self.set_tab(tab)
 
-    @staticmethod
-    def right_click(tab: Tab):
-        if callback := tab.tab_info.right_click_callback:
-            callback(tab.tab_info.title_id)
-
     def create_gui(self):
         gui = self.gui
 
@@ -115,13 +109,21 @@ class TabBar:
                 dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, c.GRAY_4)
                 dpg.add_theme_color(dpg.mvThemeCol_Text, c.WHITE)
 
+        def tab_click(s, a, u):
+            tab: Tab = dpg.get_item_user_data(a[1])
+            button = a[0]
+            if button == dpg.mvMouseButton_Left:
+                self.set_tab(tab)
+            elif button == dpg.mvMouseButton_Middle:
+                self.close_tab(tab)
+
+            if callback := tab.tab_info.click_callback:
+                callback(tab.tab_info.title_id, button)
+
         with dpg.item_handler_registry(tag=gui.tab_title_handler):
-            dpg.add_item_clicked_handler(dpg.mvMouseButton_Left,
-                                         callback=lambda s, a, u: self.set_tab(dpg.get_item_user_data(a[1])))
-            dpg.add_item_clicked_handler(dpg.mvMouseButton_Middle,
-                                         callback=lambda s, a, u: self.close_tab(dpg.get_item_user_data(a[1])))
-            dpg.add_item_clicked_handler(dpg.mvMouseButton_Right,
-                                         callback=lambda s, a, u: self.right_click(dpg.get_item_user_data(a[1])))
+            dpg.add_item_clicked_handler(dpg.mvMouseButton_Left, callback=tab_click)
+            dpg.add_item_clicked_handler(dpg.mvMouseButton_Middle, callback=tab_click)
+            dpg.add_item_clicked_handler(dpg.mvMouseButton_Right, callback=tab_click)
 
         with dpg.texture_registry():
             width, height, channels, data = dpg.load_image('icons/add.png')

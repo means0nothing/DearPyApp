@@ -27,6 +27,7 @@ _not_container_name_lookup = {
     dpg.mvDragInt: 'mvDragInt',
     dpg.mvButton: 'mvButton',
     dpg.mvCheckbox: 'mvCheckbox',
+    dpg.mvProgressBar: 'mvProgressBar',
 }
 
 _item_type_lookup = {v: k for k, v in ChainMap(_container_name_lookup,
@@ -82,6 +83,21 @@ def dpg_get_item_by_pos(items: t.Union[list, tuple], mouse_pos, horizontal: bool
         else:
             index_end = index
     return (items[index_start], index_start) if return_index else items[index_start]
+
+
+def dpg_set_y_scroll(item, window, offset: float = 0.85):
+    scroll_pos = dpg.get_y_scroll(window)
+    win_size = dpg.get_item_rect_size(window)[1]
+    btn_size = dpg.get_item_rect_size(item)[1]
+    if (pos := dpg.get_item_pos(item)[1]) > scroll_pos + win_size - btn_size:
+        dpg.set_y_scroll(window, pos - win_size * (1 - offset) + btn_size)
+    elif pos < scroll_pos:
+        dpg.set_y_scroll(window, max(0, int(pos - win_size * offset)))
+
+
+def dpg_show_popup(item, window):
+    state = dpg.get_item_state(item)
+    dpg.configure_item(window, show=True, pos=(state['rect_min'][0], state['rect_max'][1]))
 
 
 # TODO переделать под датакласс
@@ -173,9 +189,11 @@ def _get_wrapped_text(text, wrap, font):
 
 
 def dpg_get_text_from_cell(cell, wrap=-1, font=0):
-    if dpg_get_item_type(cell) == dpg.mvText:
+    if (item_type := dpg_get_item_type(cell)) == dpg.mvText:
         text = dpg.get_value(cell)
         width, height = dpg.get_text_size(text, font=font, wrap_width=wrap)
+    elif item_type != dpg.mvGroup:
+        return None, 0, 0
     else:
         width, height = dpg.get_item_rect_size(cell)
         cell_items = dpg.get_item_children(cell, slot=1)
