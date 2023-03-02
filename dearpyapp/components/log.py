@@ -195,7 +195,7 @@ class TableLog:
                 dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_22)
 
             with dpg.theme_component(dpg.mvInputText):
-                dpg.add_theme_color(dpg.mvThemeCol_Text, c.WHITE)
+                dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBg, c.GRAY_2)
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, c.GRAY_2)
                 # dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1, 1)

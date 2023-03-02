@@ -107,7 +107,7 @@ class TabBar:
                 dpg.add_theme_color(dpg.mvThemeCol_Button, c.GRAY_4)
                 dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, c.GRAY_4)
                 dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, c.GRAY_4)
-                dpg.add_theme_color(dpg.mvThemeCol_Text, c.WHITE)
+                dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
 
         def tab_click(s, a, u):
             tab: Tab = dpg.get_item_user_data(a[1])

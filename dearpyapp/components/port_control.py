@@ -115,11 +115,11 @@ class PortControlWindow:
         with dpg.theme(tag=gui.theme_port_ok):
             with dpg.theme_component():
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBg, c.GREEN_6)
-                dpg.add_theme_color(dpg.mvThemeCol_Text, c.WHITE)
+                dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
         with dpg.theme(tag=gui.theme_port_error):
             with dpg.theme_component():
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBg, c.RED_9)
-                dpg.add_theme_color(dpg.mvThemeCol_Text, c.WHITE)
+                dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
 
         with dpg.theme() as window_theme:
             with dpg.theme_component(dpg.mvAll):

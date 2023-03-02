@@ -2,11 +2,15 @@ import asyncio
 import typing as t
 import win32api
 import dearpygui.dearpygui as dpg
+import importlib
 
 from .utils import dpg_get_item_container
+from . import colors as c
 
 # item, component, theme, handler
 # update, create
+
+_light_theme = False
 
 
 def _run_callbacks(jobs):
@@ -38,6 +42,7 @@ class _DpgAppMeta(type):
             return _DpgAppMeta.instance
         else:
             raise TypeError(f'Only one {cls} instance may be created')
+
 
 # TODO total rethinking needed
 class DpgApp(metaclass=_DpgAppMeta):
@@ -95,6 +100,12 @@ class DpgApp(metaclass=_DpgAppMeta):
         self.loop.run_forever()
         self.loop.close()
 
+    @staticmethod
+    def inslall_light_theme():
+        global _light_theme
+        _light_theme = True
+        importlib.reload(c)
+
     # TODO сделать через таблицу шапку
     def set_primary_window(self, title_group):
         move = False
@@ -151,7 +162,7 @@ class DpgApp(metaclass=_DpgAppMeta):
             with dpg.group(horizontal=True, horizontal_spacing=10):
                 # TODO нужен какой-то норм механизм передачи иконок
                 textures = self.reg.textures
-                image_but_kwargs = dict(frame_padding=0, width=20, height=20, tint_color=(200, 200, 200, 200))
+                image_but_kwargs = dict(frame_padding=0, width=20, height=20, tint_color=c.GRAY_14)
                 dpg.add_image_button(textures.minimize, **image_but_kwargs,
                                      callback=lambda s, a, u: self.minimize())
                 self.btn_maximize = dpg.add_image_button(textures.maximize, **image_but_kwargs,
