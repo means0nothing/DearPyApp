@@ -108,6 +108,9 @@ def dpg_get_default_theme(tag=0):
         with dpg.theme_component(dpg.mvPlot):
             dpg.add_theme_color(dpg.mvThemeCol_WindowBg, c.GRAY_2)
 
+        with dpg.theme_component(dpg.mvDatePicker):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, c.BLUE_12)
+
         with dpg.theme_component(dpg.mvText):
             dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_22)
 
