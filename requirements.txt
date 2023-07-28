@@ -1,3 +1,4 @@
 dearpygui==1.8.0
 recordclass==0.17.2
 pywin32==304
+pyperclip==1.8.2

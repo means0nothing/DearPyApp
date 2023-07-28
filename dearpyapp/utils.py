@@ -200,20 +200,65 @@ def dpg_set_values(gui_obj, val_obj):
             dpg_set_values(gui_obj_, val_obj_)
 
 
-def _get_wrapped_text(text, wrap, font):
-    text_size = start_index = 0
+def _process_split_indexes(split_indexes: list) -> list:
+    index = len(split_indexes)
+    expected_index = None
+    for _, split_index, _ in reversed(split_indexes):
+        if expected_index is not None and split_index != expected_index:
+            break
+        expected_index = split_index - 1
+        index -= 1
+    if index != len(split_indexes) - 1:
+        for i in range(index + 1, len(split_indexes)):
+            is_whitespace_char, *_ = split_indexes[i]
+            if not is_whitespace_char:
+                break
+            index += 1
+    return split_indexes[index:]
+
+
+def _get_wrapped_text(text: str, wrap: int, font: int):
+    delimeters = {',', ';', '.', '?', '!', '\"'}
+    whitespaces = (' ', '\t')
+    split_indexes = []
+    start_index = 0
+    text_size = 0
     wrapped_text = []
     for char_index, char in enumerate(text):
+        previous_text_size = text_size
         text_size += dpg.get_text_size(char, font=font)[0]
-        if char == '\n' or (wrap and text_size > wrap):
-            wrapped_text.append(text[start_index: char_index])
-            start_index = char_index + 1 if char == '\n' else char_index
+        is_whitespace_char = char in whitespaces
+        is_split_char = is_whitespace_char or (char in delimeters)
+
+        if char == '\n':
+            split_indexes.clear()
             text_size = 0
+        elif not is_whitespace_char and wrap and text_size > wrap:
+            while True:
+                if split_indexes:
+                    split_indexes = _process_split_indexes(split_indexes)
+                    _, stop_index, split_chunk_size = split_indexes.pop(0)
+                    for index in range(len(split_indexes)):
+                        split_indexes[index][2] -= split_chunk_size
+                else:
+                    stop_index = char_index
+                    split_chunk_size = previous_text_size
+
+                wrapped_text.append(text[start_index: stop_index])
+                start_index = stop_index
+                text_size -= split_chunk_size
+                if text_size <= wrap:
+                    break
+
+        if is_split_char:
+            split_indexes.append([is_whitespace_char, char_index + 1, text_size])
+
     wrapped_text.append(text[start_index:])
-    return '\n'.join(wrapped_text)
+
+    return '\r\n'.join(wrapped_text)
 
 
-def dpg_get_text_from_cell(cell, wrap=-1, font=0):
+def dpg_get_text_from_cell(cell: int, wrap: int = -1, font: int = 0):
     if (item_type := dpg_get_item_type(cell)) == dpg.mvText:
         text = dpg.get_value(cell)
         width, height = dpg.get_text_size(text, font=font, wrap_width=wrap)

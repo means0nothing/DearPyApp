@@ -1,8 +1,9 @@
 import asyncio
+import typing as t
 
 import dearpygui.dearpygui as dpg
 from dearpyapp import *
-import typing as t
+import pyperclip
 
 
 class TableLog:
@@ -57,7 +58,7 @@ class TableLog:
                                         dpg.get_item_children(gui.table, 0), range(len_columns)):
             actual_width = dpg.get_available_content_region(group)[0] - 4
             actual_width = actual_width if index != len_columns - 1 else \
-                    actual_width - self.scroll_size
+                actual_width - self.scroll_size
             if self.column_widths[index] != actual_width:
                 self._input_text_cleanup()
                 self.column_widths[index] = actual_width
@@ -126,6 +127,10 @@ class TableLog:
         if scroll_pos == scroll_max:
             dpg.set_y_scroll(gui.table_window, -1)
 
+    def _clipboard_copy(self):
+        if dpg.is_key_down(dpg.mvKey_Control) and dpg.is_item_focused(self.gui.input_text):
+            pyperclip.copy(str.replace(pyperclip.paste(), '\r\n', ''))
+
     def _input_text_cleanup(self):
         gui = self.gui
         self.input_text_cell and dpg.move_item(self.input_text_cell, before=gui.input_text)
@@ -133,8 +138,7 @@ class TableLog:
         self.input_text_row = None
         self.input_text_cell = None
 
-
-    def cell_clicked(self):
+    def _cell_clicked(self):
         gui = self.gui
         if not self.rows or dpg.is_item_hovered(gui.input_text):
             return
@@ -147,7 +151,7 @@ class TableLog:
             width_offset += width
             height_offset += height
             container = dpg_get_item_container(container, dpg.mvChildWindow) or \
-                        dpg_get_item_container(container)
+                dpg_get_item_container(container)
 
         mouse_pos = dpg.get_mouse_pos(local=False)
         mouse_pos = (dpg.get_x_scroll(gui.table_window) + mouse_pos[0] - width_offset,
@@ -198,16 +202,16 @@ class TableLog:
                 dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBg, c.GRAY_2)
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, c.GRAY_2)
-                # dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1, 1)
-                # dpg.add_theme_color(dpg.mvThemeCol_Border, c.BLUE_18)
-                # dpg.add_theme_color(dpg.mvThemeCol_BorderShadow, c.BLUE_18)
 
         # with dpg.handler_registry(tag=gui.handler_reg):
         #     dpg.add_mouse_release_handler(0, callback=lambda s, a, u: self._width_changed())
         # get_running_app().size_subscribers.add(self._width_changed)
 
+        with dpg.handler_registry():
+            dpg.add_key_press_handler(dpg.mvKey_C, callback=lambda *_: self._clipboard_copy())
+
         with dpg.item_handler_registry() as table_handler_reg:
-            dpg.add_item_clicked_handler(dpg.mvMouseButton_Left, callback=lambda: self.cell_clicked())
+            dpg.add_item_clicked_handler(dpg.mvMouseButton_Left, callback=lambda *_: self._cell_clicked())
 
         with dpg.group(tag=gui.group):
             dpg.bind_item_theme(dpg.last_container(), table_theme)
