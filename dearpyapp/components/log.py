@@ -7,23 +7,18 @@ import pyperclip
 
 
 class TableLog:
+    # TODO callumns_info in dataclass, wrap parameter
     # TODO для скрытия колнки dpg.configure_item(col, show=True, enabled=False)
     # TODO передавать теги стиля текста, как в html
-    # TODO сделать враппер текста общий для dpg.text и dpg.input_text врапить через '\r\n' и
-    #  эти символы удалять при копировании через ctrl-c и при dpg.get_value
     # TODO не обновлять лог, если таблица не отрисовывалась (get_available_content_region(table_window) == [0, 0])
     # TODO не обновлять лог, если таблица не видна
     # TODO если строк в таблице больше ~900 и ее видно, то ctrl-c на любом input_text приводит к
     #  зависанию(коллбэки не обрабатываются, буфер обмена в других приложениях не работает), если установить в
     #  таблице clipper=True, то все ок, сейчас при больше 900, включается клиппер
-    # TODO callumns_info in dataclass
     # TODO dpg.clipper для таблиц, так как если таблица видна, то на обновление тратится много ресурсов
-    # TODO сделать кнопку вниз))
     # TODO horizontal scroll + autofit all
     # TODO сделать скрываемые колонки, попробовать использовать нативные хедеры
-    # TODO переделать ресайз, не по каждому релизу кнопки, а по релизу, если нажимали на хедер
-    #  или менялся размер окна/внешней таблицы
-    # TODO scrollsize запрашивать
+
     columns = []
     scroll_size = 20
 
@@ -33,8 +28,10 @@ class TableLog:
         self.column_widths = [0] * len(self.columns)
         self.wrap_text = True
         self.rows: dict[int, list[int]] = {}
-        self.input_text_row = None
-        self.input_text_cell = None
+        self.show_scroll_to_end_btn = False
+        self._selected_row_index = -1
+        self._input_text_row = None
+        self._input_text_cell = None
 
     # TODO сделать по-нормальному
     async def _task(self):
@@ -54,6 +51,7 @@ class TableLog:
         dpg.configure_item(gui.table_group,
                            width=dpg.get_available_content_region(gui.table_window)[0])
         len_columns = len(self.columns)
+        group = 0
         for group, column, index in zip(dpg.get_item_children(dpg.get_item_children(gui.header, 1)[0], 1),
                                         dpg.get_item_children(gui.table, 0), range(len_columns)):
             actual_width = dpg.get_available_content_region(group)[0] - 4
@@ -70,7 +68,13 @@ class TableLog:
                         if len(fields) - 1 < index or dpg_get_item_type(fields[index]) != dpg.mvText:
                             continue
                         dpg.configure_item(fields[index], wrap=actual_width)
-                # dpg.set_y_scroll(gui.table_window, -1)
+
+        if group != 0 and self.show_scroll_to_end_btn:
+            x, y = dpg.get_item_pos(group)
+            dpg.configure_item(
+                gui.scroll_to_end_btn,
+                pos=(x + dpg.get_item_rect_size(group)[0] - 20, y),
+                show=dpg.get_y_scroll_max(gui.table_window) != dpg.get_y_scroll(gui.table_window))
 
     def append(self, data):
         self.extend((data, ))
@@ -79,7 +83,6 @@ class TableLog:
         if not dpg.does_item_exist(self.gui.group):
             return
 
-        last_index = len(self.columns) - 1
         with dpg.mutex():
             with dpg_container(self.gui.table):
                 for data in iterable:
@@ -98,19 +101,23 @@ class TableLog:
                             fields.append(dpg.add_text(field, color=color,
                                                        wrap=self.column_widths[index] if self.wrap_text else -1))
                     self.rows.update({row: fields})
-            self.set_y_scroll()
+            self._delete_rows()
 
     def _process_data(self, data) -> t.Iterable:
         ...
 
     def clear(self):
         gui = self.gui
-        self.input_text_row and self._input_text_cleanup()
+        self._input_text_row and self._input_text_cleanup()
         dpg.delete_item(gui.table, slot=1, children_only=True)
         dpg.set_y_scroll(gui.table_window, -1)
+        self._selected_row_index = -1
         self.rows.clear()
 
-    def set_y_scroll(self):
+    def set_y_scroll_to_end(self):
+        dpg.set_y_scroll(self.gui.table_window, -1)
+
+    def _delete_rows(self):
         gui = self.gui
         scroll_max = dpg.get_y_scroll_max(gui.table_window)
         scroll_pos = dpg.get_y_scroll(gui.table_window)
@@ -121,11 +128,12 @@ class TableLog:
             for row_index in range(rows_to_delete):
                 row = rows[row_index]
                 (row in self.rows) and self.rows.pop(row)
-                (row == self.input_text_row) and self._input_text_cleanup()
+                (row == self._input_text_row) and self._input_text_cleanup()
                 dpg.delete_item(row)
+            self.select_row(self._selected_row_index - rows_to_delete)
 
         if scroll_pos == scroll_max:
-            dpg.set_y_scroll(gui.table_window, -1)
+            self.set_y_scroll_to_end()
 
     def _clipboard_copy(self):
         if dpg.is_key_down(dpg.mvKey_Control) and dpg.is_item_focused(self.gui.input_text):
@@ -133,10 +141,10 @@ class TableLog:
 
     def _input_text_cleanup(self):
         gui = self.gui
-        self.input_text_cell and dpg.move_item(self.input_text_cell, before=gui.input_text)
+        self._input_text_cell and dpg.move_item(self._input_text_cell, before=gui.input_text)
         dpg.move_item(gui.input_text, parent=gui.input_text_stage)
-        self.input_text_row = None
-        self.input_text_cell = None
+        self._input_text_row = None
+        self._input_text_cell = None
 
     def _cell_clicked(self):
         gui = self.gui
@@ -160,14 +168,29 @@ class TableLog:
         row, row_index = dpg_get_item_by_pos(tuple(self.rows.values()), mouse_pos, return_index=True)
         cell, cell_index = dpg_get_item_by_pos(row, mouse_pos, horizontal=True, return_index=True)
         text, width, height = dpg_get_text_from_cell(cell, wrap=self.column_widths[cell_index])
-        if text:
-            self.input_text_cell and dpg.move_item(self.input_text_cell, before=gui.input_text)
-            self.input_text_row = tuple(self.rows)[row_index]
-            self.input_text_cell = cell
+        if text is None:
+            self._input_text_cleanup()
+        else:
+            self._input_text_cell and dpg.move_item(self._input_text_cell, before=gui.input_text)
+            self._input_text_row = tuple(self.rows)[row_index]
+            self._input_text_cell = cell
             dpg.configure_item(gui.input_text, default_value=text,
-                               width=width + 2, height=height)  # width + 1 prevent input_text to scrolling
+                               width=width + 2, height=height)  # width + 2 prevent input_text to scrolling
             dpg.move_item(gui.input_text, before=cell)
             dpg.move_item(cell, parent=gui.input_text_stage)
+
+        self.select_row(row_index)
+
+    def select_row(self, index: int = None):
+        try:
+            if self._selected_row_index >= 0:
+                dpg.unset_table_row_color(self.gui.table, self._selected_row_index)
+            if index is not None:
+                self._selected_row_index = index
+            if self._selected_row_index >= 0:
+                dpg.set_table_row_color(self.gui.table, self._selected_row_index, c.BLUE_4)
+        except SystemError:
+            self._selected_row_index = -1
 
     # TODO implement delete method
     # def close(self):
@@ -200,12 +223,8 @@ class TableLog:
 
             with dpg.theme_component(dpg.mvInputText):
                 dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
-                dpg.add_theme_color(dpg.mvThemeCol_FrameBg, c.GRAY_2)
-                dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, c.GRAY_2)
-
-        # with dpg.handler_registry(tag=gui.handler_reg):
-        #     dpg.add_mouse_release_handler(0, callback=lambda s, a, u: self._width_changed())
-        # get_running_app().size_subscribers.add(self._width_changed)
+                dpg.add_theme_color(dpg.mvThemeCol_FrameBg, c.BLUE_4)
+                dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, c.BLUE_4)
 
         with dpg.handler_registry():
             dpg.add_key_press_handler(dpg.mvKey_C, callback=lambda *_: self._clipboard_copy())
@@ -215,6 +234,12 @@ class TableLog:
 
         with dpg.group(tag=gui.group):
             dpg.bind_item_theme(dpg.last_container(), table_theme)
+            dpg.bind_item_theme(
+                dpg.add_button(tag=gui.scroll_to_end_btn, label='\u25BC', height=20, width=20, pos=(0, 0), show=False,
+                               callback=lambda *_: self.set_y_scroll_to_end()),
+                dpg_get_color_theme(colors=(c.TRANSPARENT, c.GRAY_5, c.TRANSPARENT),
+                                    text_color=c.YELLOW_19))
+
             # TODO cleanup_stage after close in delete method
             with dpg.stage(tag=gui.input_text_stage):
                 dpg.add_input_text(readonly=True, multiline=True, tag=gui.input_text)
@@ -230,7 +255,6 @@ class TableLog:
             with dpg.child_window(border=False, tag=gui.table_window, height=-2):
                 with dpg.group(tag=gui.table_group):
                     dpg.bind_item_handler_registry(gui.table_group, table_handler_reg)
-
                     with dpg.table(policy=dpg.mvTable_SizingFixedFit, borders_innerH=True, borders_outerH=False,
                                    borders_innerV=True, borders_outerV=False, tag=gui.table, header_row=False,
                                    resizable=False, reorderable=True, freeze_rows=1, hideable=True,
@@ -250,5 +274,6 @@ class TableLog:
         table_window: int
         table_group: int
         table: int
+        scroll_to_end_btn: int
         # handler_reg: int
 
