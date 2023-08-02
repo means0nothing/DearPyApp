@@ -18,6 +18,7 @@ class TableLog:
     # TODO dpg.clipper для таблиц, так как если таблица видна, то на обновление тратится много ресурсов
     # TODO horizontal scroll + autofit all
     # TODO сделать скрываемые колонки, попробовать использовать нативные хедеры
+    # TODO self.rows to list?
 
     columns = []
     scroll_size = 20
@@ -165,8 +166,9 @@ class TableLog:
         mouse_pos = (dpg.get_x_scroll(gui.table_window) + mouse_pos[0] - width_offset,
                      dpg.get_y_scroll(gui.table_window) + mouse_pos[1] - height_offset)  # + 15
 
-        row, row_index = dpg_get_item_by_pos(tuple(self.rows.values()), mouse_pos, return_index=True)
-        cell, cell_index = dpg_get_item_by_pos(row, mouse_pos, horizontal=True, return_index=True)
+        rows = tuple(self.rows.values())
+        _, row_index = dpg_get_item_by_pos([cells[0] for cells in rows], mouse_pos, return_index=True)
+        cell, cell_index = dpg_get_item_by_pos(rows[row_index], mouse_pos, horizontal=True, return_index=True)
         text, width, height = dpg_get_text_from_cell(cell, wrap=self.column_widths[cell_index])
         if text is None:
             self._input_text_cleanup()

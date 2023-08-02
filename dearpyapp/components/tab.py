@@ -25,9 +25,11 @@ class Tab:
         ...
 
 
+# TODO when tabs not fits to width add combobox with extra tabs
 class TabBar:
     def __init__(self, *, title_height=20, title_width=120, tab_factory=None):
         self.gui = self._Gui()
+        self.drag_tabs = False
         self.title_height = title_height
         self.title_width = title_width
         self.tab_factory = tab_factory
@@ -109,10 +111,16 @@ class TabBar:
                 dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, c.GRAY_4)
                 dpg.add_theme_color(dpg.mvThemeCol_Text, c.GRAY_25)
 
+        drag_source_index = 0
+
         def tab_click(s, a, u):
+            nonlocal drag_source_index
             tab: Tab = dpg.get_item_user_data(a[1])
             button = a[0]
             if button == dpg.mvMouseButton_Left:
+                if self.drag_tabs:
+                    drag_source_index = self.tabs.index(tab)
+                    dpg.configure_item(drag_registry, show=True)
                 self.set_tab(tab)
             elif button == dpg.mvMouseButton_Middle:
                 self.close_tab(tab)
@@ -120,10 +128,24 @@ class TabBar:
             if callback := tab.tab_info.click_callback:
                 callback(tab.tab_info.title_id, button)
 
+        def mouse_move(mouse_pos):
+            nonlocal drag_source_index
+            _, target_index = dpg_get_item_by_pos(gui.tab_titles_group, mouse_pos, True, return_index=True)
+            if target_index != drag_source_index:
+                source_tab = self.tabs.pop(drag_source_index)
+                self.tabs.insert(target_index, source_tab)
+                drag_source_index = target_index
+                dpg.reorder_items(gui.tab_titles_group, 1, [tab.tab_info.title_id for tab in self.tabs])
+
         with dpg.item_handler_registry(tag=gui.tab_title_handler):
             dpg.add_item_clicked_handler(dpg.mvMouseButton_Left, callback=tab_click)
             dpg.add_item_clicked_handler(dpg.mvMouseButton_Middle, callback=tab_click)
             dpg.add_item_clicked_handler(dpg.mvMouseButton_Right, callback=tab_click)
+
+        with dpg.handler_registry(show=False) as drag_registry:
+            dpg.add_mouse_release_handler(
+                dpg.mvMouseButton_Left, callback=lambda *_: dpg.configure_item(drag_registry, show=False))
+            dpg.add_mouse_move_handler(callback=lambda s, a, u: mouse_move(a))
 
         with dpg.texture_registry():
             width, height, channels, data = dpg.load_image('icons/add.png')

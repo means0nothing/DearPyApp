@@ -16,6 +16,7 @@ _container_name_lookup = {
     dpg.mvChildWindow: 'mvChildWindow',
     dpg.mvGroup: 'mvGroup',
     dpg.mvTab: 'mvTab',
+    dpg.mvTableRow: 'mvTableRow',
 }
 
 _not_container_name_lookup = {
@@ -92,8 +93,15 @@ def dpg_get_item_type(item) -> int:
     return item_type
 
 
-def dpg_get_item_by_pos(items: t.Union[list, tuple], mouse_pos, horizontal: bool = False, *,
+def dpg_get_item_by_pos(items: t.Union[int, list[int], tuple[int]], mouse_pos, horizontal: bool = False, *,
                         return_index=False):
+    if type(items) == int:
+        items = dpg.get_item_children(items, 1)
+
+    # TODO разобраться с позицией get_item_pos, get_item_rect_min на различных элементах
+    # TODO если в таблице включен клиппер, то get_item_pos возвращает 0, если элемент вне видимости
+    get_item_pos = dpg.get_item_pos if dpg_get_item_type(items[0]) == dpg.mvText else dpg.get_item_rect_min
+
     index_start = 0
     index_end = len(items)
     while True:
@@ -101,9 +109,7 @@ def dpg_get_item_by_pos(items: t.Union[list, tuple], mouse_pos, horizontal: bool
         if index == index_start:
             break
         item = items[index]
-        item = item if isinstance(item, (str, int)) else item[0]
-        # TODO если в таблице включен клиппер, то get_item_pos возвращает 0, если элемент вне видимости
-        if mouse_pos[not horizontal] >= dpg.get_item_pos(item)[not horizontal]:
+        if mouse_pos[not horizontal] >= get_item_pos(item)[not horizontal]:
             index_start = index
         else:
             index_end = index
