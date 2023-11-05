@@ -138,7 +138,9 @@ class TableLog:
 
     def _clipboard_copy(self):
         if dpg.is_key_down(dpg.mvKey_Control) and dpg.is_item_focused(self.gui.input_text):
-            pyperclip.copy(str.replace(pyperclip.paste(), '\r\n', ''))
+            pyperclip.copy(str.replace(
+                pyperclip.paste() or '', '\r\n', ''
+            ))
 
     def _input_text_cleanup(self):
         gui = self.gui

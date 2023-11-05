@@ -3,6 +3,9 @@ import typing as t
 import win32api
 import dearpygui.dearpygui as dpg
 import importlib
+import traceback
+
+import pyperclip
 
 from .utils import dpg_get_item_container
 from . import colors as c
@@ -11,15 +14,6 @@ from . import colors as c
 # update, create
 
 _light_theme = False
-
-
-def _run_callbacks(jobs):
-    if jobs is not None:
-        for job in jobs:
-            if job[0] is not None:
-                job[0](job[1], job[2], job[3])
-                # args_num = len(inspect.signature(job[0]).parameters)
-                # job[0](*job[1:args_num + 1])
 
 
 class _DpgAppMeta(type):
@@ -47,13 +41,54 @@ class _DpgAppMeta(type):
 # TODO total rethinking needed
 class DpgApp(metaclass=_DpgAppMeta):
     loop = asyncio.get_event_loop()
-    primary_window = None
+    primary_window: int = None
+    btn_maximize = None
+    btn_restore = None
     viewport_size = None
     viewport_pos = None
     is_viewport_maximized = False
-    btn_maximize = None
-    btn_restore = None
     size_subscribers = set()  # TODO как-то не так надо
+
+
+    def _show_error_window(self, e: BaseException):
+        width = 200
+        with dpg.window(
+                modal=True, no_move=True, no_close=True, no_collapse=True, no_resize=True, width=width,
+                no_title_bar=True, min_size=(100, 20),
+                pos=(int(dpg.get_item_rect_size(self.primary_window)[0] / 2 - width / 2), 30),
+        ) as error_window:
+            dpg.add_text(type(e).__name__, color=c.RED_23)
+            error = str(e)
+            if len(error) > 200:
+                error = error[:200] + '...'
+            dpg.add_text(error, wrap=width-10)
+            if error:
+                dpg.add_spacer()
+
+            with dpg.group(horizontal=True):
+                traceback_error = traceback.format_exc()
+                dpg.add_button(
+                    label='Copy Traceback', width=width - 70,
+                    callback=lambda *_: pyperclip.copy(traceback_error)
+                )
+                dpg.add_button(
+                    label='OK', width=-1,
+                    callback=lambda *_:dpg.delete_item(error_window)
+                )
+
+    def _run_callbacks(self, jobs):
+        if jobs is None:
+            return
+
+        for job in jobs:
+            if job[0] is not None:
+                try:
+                    job[0](job[1], job[2], job[3])
+                    # args_num = len(inspect.signature(job[0]).parameters)
+                    # job[0](*job[1:args_num + 1])
+                except BaseException as e:
+                    self._show_error_window(e)
+
 
     def run(
         self, *, title: str = 'App', small_icon: str = '', large_icon: str = '',
@@ -88,7 +123,7 @@ class DpgApp(metaclass=_DpgAppMeta):
         async def gui_task():
             while dpg.is_dearpygui_running():
                 jobs = dpg.get_callback_queue()
-                _run_callbacks(jobs)
+                self._run_callbacks(jobs)
                 dpg.render_dearpygui_frame()
                 # TODO добавить в параметры период, а vsync убрать
                 await asyncio.sleep(1 / 40)
